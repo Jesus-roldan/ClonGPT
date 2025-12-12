@@ -11,9 +11,7 @@ Route::get('dashboard', function () {
 
 Route::middleware(['auth','verified'])->group(function(){
 
-Route::get('/', function() {
-        return redirect()->route('conversations.index');
-    })->name('root');
+Route::get('/', function() {return redirect()->route('conversations.index');})->name('root');
 
 Route::get('conversations/{conversation?}', [ConversationController::class, 'index'])->name('conversations.index');
 
@@ -21,11 +19,10 @@ Route::delete('conversations/{conversation?}', [ConversationController::class, '
 
 Route::post('conversations/{conversation}/send-message', [ConversationController::class, 'sendMessage'])->name('conversations.sendMessage');
 
-Route::resource('conversations', ConversationController::class)->except('index', 'destroy');
+Route::post('conversations/{conversation}/model', [ConversationController::class, 'updateModel'])->name('conversations.updateModel');
+
+Route::resource('conversations', ConversationController::class)->except('index', 'destroy', 'updateModel');
 
 });
-
-
-
 
 require __DIR__.'/settings.php';

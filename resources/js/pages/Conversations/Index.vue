@@ -18,8 +18,26 @@ const props = defineProps({
 
 const form = useForm({
     prompt: '',
-    model: '',
+    model: props.selectedModel ?? '',
 });
+
+watch(
+    () => props.activeConversationId,
+    async (newId, oldId) => {
+        if (oldId && form.model) {
+            try {
+                await router.post(`/conversations/${oldId}/model`, {
+                    model: form.model,
+                });
+            } catch (e) {
+                console.error('Impossible d’enregistrer le modèle précédent', e);
+            }
+        }
+
+        form.model = props.selectedModel ?? '';
+    },
+    { immediate: true }
+);
 
 const messagesEnd = ref(null);
 
@@ -59,6 +77,10 @@ const submit = () => {
                 preserveScroll: true,
                 preserveState: false,
                 onSuccess: () => form.reset('prompt'),
+                data: {
+                    prompt: form.prompt,
+                    model: form.model,
+                },
             },
         );
     }
@@ -81,6 +103,17 @@ const deleteconversation = (conversations) => {
     }
 };
 
+const updateModel = async () => {
+    if (!props.activeConversationId) return;
+    try {
+        await router.post(`/conversations/${props.activeConversationId}/model`, {
+            model: form.model,
+        });
+        console.log('Modelo guardado:', form.model);
+    } catch (e) {
+        console.error('Impossible d’enregistrer le modèle précédent', e);
+    }
+};
 </script>
 
 <template>
@@ -213,7 +246,7 @@ const deleteconversation = (conversations) => {
                             >Modèle :</label
                         >
                         <select
-                            v-model="form.model"
+                            v-model="form.model" @change="updateModel"
                             class="w-full rounded-xl border border-gray-300 bg-white p-2 text-gray-900 transition focus:ring-2 focus:ring-purple-400"
                             :disabled="form.processing"
                         >

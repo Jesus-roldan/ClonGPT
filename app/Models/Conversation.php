@@ -8,7 +8,8 @@ class Conversation extends Model
 {
     protected $fillable = [
         'user_id',
-        'title'
+        'title',
+        'model',
     ];
 
     public function user(){

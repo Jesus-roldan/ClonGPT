@@ -35,11 +35,13 @@ class ConversationController extends Controller
 
         $models = $this->askService->getModels();
 
+
         return Inertia::render('Conversations/Index', [
             'activeConversationId' => $conversation ? $conversation->id : null,
             'messages' => $messages,
             'conversations' => $userConversations,
-            'models' => $models
+            'models' => $models,
+            'selectedModel' => $conversation->model ?? null,
         ]);
     }
 
@@ -87,28 +89,22 @@ class ConversationController extends Controller
         return redirect()->route('conversations.index', $conversation->id);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Conversation $conversation)
+    public function updateModel(Request $request, Conversation $conversation)
     {
-        //
-    }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Conversation $conversation)
-    {
-        //
-    }
+        if ($conversation->user_id !== Auth::id()) {
+            abort(403);
+        }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Conversation $conversation)
-    {
-        //
+        $request->validate([
+            'model' => 'required|string',
+        ]);
+
+        $conversation->update([
+            'model' => $request->model,
+        ]);
+
+        return response()->json(['success' => true]);
     }
     /**
      * Remove the specified resource from storage.
@@ -129,6 +125,11 @@ class ConversationController extends Controller
 
 
         $userPrompt = $request->input('prompt');
+        $model = $request->input('model');
+
+         if ($model) {
+        $conversation->update(['model' => $model]);
+         }
 
         $apiMessages = $conversation->messages()
             ->orderBy('id')
@@ -141,35 +142,33 @@ class ConversationController extends Controller
             $aiResponseContent = $this->askService->sendMessage($apiMessages);
 
         } catch (\Exception $e) {
-
              $aiResponseContent = $e->getMessage();
-
         }
 
-        $conversation->messages()->create([
-            'role' => 'user',
-            'content' => $userPrompt,
+        $conversation->messages()->createMany([
+            [
+                'role' => 'user',
+                'content' => $userPrompt,
+            ],
+            [
+                'role' => 'assistant',
+                'content' => $aiResponseContent,
+            ],
         ]);
 
-        $conversation->messages()->create([
-            'role' => 'assistant',
-            'content' => $aiResponseContent,
+        $conversation->update(['title'=>Str::limit($userPrompt,50)]);
+
+
+        $messages = $conversation->messages()->orderBy('id')->get(['id','role','content'])->toArray();
+        $userConversations = auth()->user()->conversations()->orderBy('updated_at','desc')->get(['id','title']);
+
+        return Inertia::render('Conversations/Index', [
+            'activeConversationId' => $conversation->id,
+            'messages' => $messages,
+            'conversations' => $userConversations,
+            'models' => $this->askService->getModels(),
+            'selectedModel' => $conversation->model,
         ]);
-
-        // return redirect()->route('conversations.index', $conversation->id);
-        // return response()->noContent();
-         $conversation->update(['title'=>Str::limit($userPrompt,50)]);
-
-    // Devolver Inertia con props actualizados
-    $messages = $conversation->messages()->orderBy('id')->get(['id','role','content'])->toArray();
-    $userConversations = auth()->user()->conversations()->orderBy('updated_at','desc')->get(['id','title']);
-
-    return Inertia::render('Conversations/Index', [
-        'activeConversationId' => $conversation->id,
-        'messages' => $messages,
-        'conversations' => $userConversations,
-        'models' => $this->askService->getModels(),
-    ]);
     }
 }
 
