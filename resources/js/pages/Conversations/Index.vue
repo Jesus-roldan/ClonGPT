@@ -18,9 +18,7 @@ const props = defineProps({
 
 const form = useForm({
     prompt: '',
-    model:
-        props.selectedModel ||
-        (props.models.length ? props.models[0].id : null),
+    model: '',
 });
 
 const messagesEnd = ref(null);

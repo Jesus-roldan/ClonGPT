@@ -17,7 +17,7 @@ class SimpleAskService
 {
     /*Solo en prueba quitarlo antes de entregar*/
 
-public const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+public const DEFAULT_MODEL = 'openai/gpt-5-nano';
 
 private string $apiKey;
 private string $baseUrl;
