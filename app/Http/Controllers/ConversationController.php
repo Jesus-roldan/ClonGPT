@@ -120,7 +120,7 @@ class ConversationController extends Controller
         }
 
         $conversation->delete();
-        return redirect()->back();
+        return redirect()->route('conversations.index');
     }
 
     public function sendMessage(Request $request, Conversation $conversation)

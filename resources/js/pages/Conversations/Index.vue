@@ -66,6 +66,22 @@ const submit = () => {
     }
 };
 
+const deleteconversation = (conversations) => {
+    if (
+        confirm(
+            'Êtes-vous sûr de vouloir supprimer cette conversation ? Cette action est irréversible.',
+        )
+    ) {
+        form.delete(
+            destroy(conversations),
+            {
+                onSuccess: () => {
+                    window.location.href = route('conversations.index');
+                },
+            },
+        );
+    }
+};
 
 </script>
 
@@ -79,22 +95,30 @@ const submit = () => {
                 💬 Conversations
             </h2>
             <nav class="flex-1 space-y-2 overflow-y-auto pr-2">
-                <Link
-                    v-for="c in props.conversations"
-                    :key="c.id"
-                    :href="index(c.id)"
-                    :class="[
-                        'flex cursor-pointer rounded-xl p-3 shadow-sm transition hover:bg-gray-200',
-                        c.id === props.activeConversationId
-                            ? 'border-l-4 border-blue-600 bg-blue-100 font-semibold'
-                            : 'bg-gray-100',
-                    ]"
-                >
-                    <p class="truncate font-semibold text-gray-800">
-                        {{ c.title }}
-                    </p>
+                    <div
+                        v-for="c in props.conversations"
+                        :key="c.id"
+                        class="flex items-center justify-between rounded-xl bg-gray-100 p-3 shadow-sm transition hover:bg-gray-200"
+                        :class="{
+                            'border-l-4 border-blue-600 bg-blue-100 font-semibold':
+                                c.id === props.activeConversationId,
+                        }"
+                    >
+                        <Link
+                            :href="index(c.id)"
+                            class="flex-1 truncate font-semibold text-gray-800"
+                        >
+                            {{ c.title }}
+                        </Link>
+                        <button
+                            @click="deleteconversation(c.id)"
+                            class="ml-2 rounded-full bg-red-500 px-2 py-1 text-sm font-bold text-white hover:bg-red-600"
+                            title="Supprimer la conversation"
+                        >
+                            🗑️
+                        </button>
+                    </div>
 
-                </Link>
             </nav>
             <Link
                 :href="index()"

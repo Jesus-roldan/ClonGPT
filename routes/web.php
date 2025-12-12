@@ -17,11 +17,14 @@ Route::get('/', function() {
 
 Route::get('conversations/{conversation?}', [ConversationController::class, 'index'])->name('conversations.index');
 
+Route::delete('conversations/{conversation?}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
+
 Route::post('conversations/{conversation}/send-message', [ConversationController::class, 'sendMessage'])->name('conversations.sendMessage');
+
+Route::resource('conversations', ConversationController::class)->except('index', 'destroy');
 
 });
 
-Route::resource('conversations', ConversationController::class)->except('index');
 
 
 
