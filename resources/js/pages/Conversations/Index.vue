@@ -153,9 +153,13 @@ const updateModel = async () => {
             </nav>
             <Link
                 :href="index()"
-                class="mt-4 w-full rounded-xl bg-purple-600 px-4 py-2 font-bold text-white shadow-md transition hover:bg-purple-700"
-            >
+                class="mt-4 w-full rounded-xl bg-purple-600 px-4 py-2 font-bold text-white shadow-md transition hover:bg-purple-700">
                 ➕ Nouvelle Conversation
+            </Link>
+            <Link
+                href="/chat/instructions"
+                class="mt-2 w-full rounded-xl bg-green-600 px-4 py-2 font-bold text-white shadow-md transition hover:bg-green-700">
+                ⚙️ Instructions personnalisées
             </Link>
         </aside>
 
