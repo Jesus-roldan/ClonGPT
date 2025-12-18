@@ -26,6 +26,9 @@ Route::resource('conversations', ConversationController::class)->except('index',
 
 Route::get('/chat/instructions', [ChatInstructionController::class, 'edit'])->name('chat.instructions.edit');
 Route::post('/chat/instructions', [ChatInstructionController::class, 'store'])->name('chat.instructions.store');
+
+Route::get('/ask-stream', [\App\Http\Controllers\AskStreamController::class, 'index'])->name('stream.index');
+Route::post('/ask-stream', [\App\Http\Controllers\AskStreamController::class, 'stream'])->name('stream.post');
 });
 
 require __DIR__.'/settings.php';
