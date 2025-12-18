@@ -77,10 +77,6 @@ const submit = () => {
                 preserveScroll: true,
                 preserveState: false,
                 onSuccess: () => form.reset('prompt'),
-                data: {
-                    prompt: form.prompt,
-                    model: form.model,
-                },
             },
         );
     }

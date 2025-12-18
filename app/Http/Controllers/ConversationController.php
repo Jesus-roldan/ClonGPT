@@ -29,8 +29,6 @@ class ConversationController extends Controller
             ? $conversation->messages()->orderBy('id')->get(['role', 'content', 'id'])->toArray()
             : [];
 
-            // dd($messages);
-
         $userConversations = $user->conversations()->orderBy('updated_at', 'desc')->get(['id', 'title']);
 
         $models = $this->askService->getModels();
@@ -64,12 +62,38 @@ class ConversationController extends Controller
 
         $userPrompt = $request->input('prompt');
 
+        $instruction = Auth::user()->chatInstruction;
+        $commands = $instruction?->commands ?? [];
+
+        $systemCommandPrompt = null;
+
+        foreach ($commands as $command => $definition) {
+            if (str_starts_with($userPrompt, $command)) {
+                $systemCommandPrompt = "COMMANDE PERSONNALISÉE {$command}:\n{$definition}";
+                $userPrompt = trim(str_replace($command, '', $userPrompt));
+                break;
+            }
+        }
+
+
         $conversation = Conversation::create([
             'user_id' => Auth::id(),
             'title' => 'Nouvelle conversation…',
         ]);
 
-        $apiMessages = [['role' => 'user', 'content' => $userPrompt]];
+        $apiMessages = [];
+
+        if ($systemCommandPrompt) {
+            $apiMessages[] = [
+                'role' => 'system',
+                'content' => $systemCommandPrompt,
+            ];
+        }
+
+        $apiMessages[] = [
+            'role' => 'user',
+            'content' => $userPrompt,
+        ];
 
         try {
             $aiResponseContent = $this->askService->sendMessage($apiMessages);
@@ -121,54 +145,82 @@ class ConversationController extends Controller
 
     public function sendMessage(Request $request, Conversation $conversation)
     {
-        $request->validate(['prompt' => 'required|string|max:1000']);
+        $request->validate([
+        'prompt' => 'required|string|max:1000',
+    ]);
 
+    $userPrompt = $request->input('prompt');
+    $model = $request->input('model');
 
-        $userPrompt = $request->input('prompt');
-        $model = $request->input('model');
-
-         if ($model) {
+    if ($model) {
         $conversation->update(['model' => $model]);
-         }
-
-        $apiMessages = $conversation->messages()
-            ->orderBy('id')
-            ->get(['role', 'content'])
-            ->toArray();
-
-        $apiMessages[] = ['role' => 'user', 'content' => $userPrompt];
-
-        try {
-            $aiResponseContent = $this->askService->sendMessage($apiMessages);
-
-        } catch (\Exception $e) {
-             $aiResponseContent = $e->getMessage();
-        }
-
-        $conversation->messages()->createMany([
-            [
-                'role' => 'user',
-                'content' => $userPrompt,
-            ],
-            [
-                'role' => 'assistant',
-                'content' => $aiResponseContent,
-            ],
-        ]);
-
-        $conversation->update(['title'=>Str::limit($userPrompt,50)]);
-
-
-        $messages = $conversation->messages()->orderBy('id')->get(['id','role','content'])->toArray();
-        $userConversations = auth()->user()->conversations()->orderBy('updated_at','desc')->get(['id','title']);
-
-        return Inertia::render('Conversations/Index', [
-            'activeConversationId' => $conversation->id,
-            'messages' => $messages,
-            'conversations' => $userConversations,
-            'models' => $this->askService->getModels(),
-            'selectedModel' => $conversation->model,
-        ]);
     }
-}
 
+    $instruction = Auth::user()->chatInstruction;
+    $commands = $instruction?->commands ?? [];
+
+    $commandPrompt = null;
+    foreach ($commands as $command => $definition) {
+        if (str_starts_with($userPrompt, $command)) {
+
+            $commandPrompt = "{$definition}\n\nTexte à traiter : " . trim(str_replace($command, '', $userPrompt));
+            break;
+        }
+    }
+
+    $conversationMessages = $conversation->messages()
+        ->orderBy('id')
+        ->get(['role', 'content'])
+        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
+        ->toArray();
+
+    $apiMessages = [];
+
+    $systemPrompt = $this->askService->getSystemPrompt()['content'] ?? null;
+    if ($systemPrompt) {
+        $apiMessages[] = [
+            'role' => 'system',
+            'content' => $systemPrompt,
+        ];
+    }
+
+    $apiMessages = [...$apiMessages, ...$conversationMessages];
+
+    if ($commandPrompt) {
+        $apiMessages[] = [
+            'role' => 'user',
+            'content' => $commandPrompt,
+        ];
+    } else {
+        $apiMessages[] = [
+            'role' => 'user',
+            'content' => $userPrompt,
+        ];
+    }
+
+    try {
+        $aiResponseContent = $this->askService->sendMessage($apiMessages, $model);
+    } catch (\Exception $e) {
+        $aiResponseContent = "Erreur : " . $e->getMessage();
+    }
+
+    $conversation->messages()->createMany([
+        ['role' => 'user', 'content' => $userPrompt],
+        ['role' => 'assistant', 'content' => $aiResponseContent],
+    ]);
+
+    $conversation->update(['title' => Str::limit($userPrompt, 50)]);
+
+    $messages = $conversation->messages()->orderBy('id')->get(['id', 'role', 'content'])->toArray();
+    $userConversations = auth()->user()->conversations()->orderBy('updated_at', 'desc')->get(['id', 'title']);
+
+    return Inertia::render('Conversations/Index', [
+        'activeConversationId' => $conversation->id,
+        'messages' => $messages,
+        'conversations' => $userConversations,
+        'models' => $this->askService->getModels(),
+        'selectedModel' => $conversation->model,
+    ]);
+    }
+
+}

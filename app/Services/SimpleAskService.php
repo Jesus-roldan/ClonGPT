@@ -123,13 +123,55 @@ private function getSystemPrompt(): array
     $user = auth()->user()?->name ?? 'l\'utilisateur';
     $now = now()->locale('fr')->format('l d F Y H:i');
 
+    $chatInstructions = auth()->user()?->chatInstruction;
+
+    $commandsPrompt = '';
+    if ($chatInstructions && !empty($chatInstructions->commands)) {
+        foreach ($chatInstructions->commands as $cmd => $enabled) {
+            if ($enabled) {
+                $commandsPrompt .= "$cmd → " . $chatInstructions->commands[$cmd] . "\n";
+            }
+        }
+    }
+
+    $aboutYouPrompt = '';
+    if ($chatInstructions && $chatInstructions->about) {
+        $about = $chatInstructions->about;
+        $aboutYouPrompt = "L'utilisateur : profession={$about['profession']}, intérêts={$about['interests']}, niveau={$about['level']}, objectifs={$about['goals']}\n";
+    }
+
+    $behaviourPrompt = '';
+    if ($chatInstructions && $chatInstructions->behaviour) {
+        $beh = $chatInstructions->behaviour;
+        $behaviourPrompt = "Ton={$beh['tone']}, Format={$beh['format']}, Longueur={$beh['length']}, Style={$beh['style']}\n";
+    }
+
+    $systemMessage = view('prompts.system', [
+        'now' => $now,
+        'user' => $user,
+    ])->render();
+
+    $fullPrompt = $systemMessage
+                . "\n=== À propos de l'utilisateur ===\n"
+                . $aboutYouPrompt
+                . $behaviourPrompt
+                . "\n=== Commandes personnalisées ===\n"
+                . $commandsPrompt;
+
     return [
         'role' => 'system',
-        'content' => view('prompts.system', [
-            'now' => $now,
-            'user' => $user,
-        ])->render(),
+        'content' => $fullPrompt,
     ];
 }
 
+
+    // return [
+    //     'role' => 'system',
+    //     'content' => view('prompts.system', [
+    //         'now' => $now,
+    //         'user' => $user,
+    //     ])->render(),
+    // ];
 }
+
+

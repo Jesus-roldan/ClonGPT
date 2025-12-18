@@ -1,5 +1,6 @@
 <script setup>
 import { useForm, Link } from '@inertiajs/vue3'
+import { ref } from 'vue'
 
 
 const props = defineProps({
@@ -28,15 +29,18 @@ const form = useForm({
     commands: instruction.commands ?? {},
 })
 
-const commandsList = {
-    '/météo': 'Affiche la météo actuelle et les prévisions',
-    '/citation': 'Génère une citation inspirante',
-    '/résumé': 'Résume le texte fourni',
-    '/review': 'Analyse et critique du code',
-    '/explain': 'Explique comme si j’avais 5 ans',
-    '/feedback': 'Formule un retour constructif',
-}
+const newCommand = ref('')
+const newDefinition = ref('')
 
+const addCommand = () => {
+  if (!newCommand.value.startsWith('/')) return
+  if (!newDefinition.value) return
+
+  form.commands[newCommand.value] = newDefinition.value
+
+  newCommand.value = ''
+  newDefinition.value = ''
+}
 
 const submit = () => {
 
@@ -165,21 +169,51 @@ const submit = () => {
       </section>
 
       <!-- ================= COMMANDES ================= -->
-      <section class="rounded-2xl bg-white p-6 shadow-md space-y-4">
+      <section class="rounded-2xl bg-white p-6 shadow-md space-y-6">
         <h2 class="text-xl font-bold text-gray-800">⌨️ Commandes personnalisées</h2>
 
-        <div
-          v-for="(desc, cmd) in commandsList"
-          :key="cmd"
-          class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 hover:bg-gray-100"
-        >
-          <input type="checkbox" v-model="form.commands[cmd]" class="h-4 w-4" />
-          <div>
-            <span class="font-mono font-semibold">{{ cmd }}</span>
-            <p class="text-sm text-gray-600">{{ desc }}</p>
-          </div>
+        <!-- Ajout d’une commande -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input
+            v-model="newCommand"
+            placeholder="/résumé"
+            class="rounded-xl border border-gray-300 p-3 font-mono"
+            />
+
+            <input
+            v-model="newDefinition"
+            placeholder="Définition de la commande"
+            class="md:col-span-2 rounded-xl border border-gray-300 p-3"
+            />
         </div>
-      </section>
+
+        <button
+            type="button"
+            @click="addCommand"
+            class="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+        >
+            ➕ Ajouter la commande
+        </button>
+
+        <div
+            v-for="(definition, command) in form.commands"
+            :key="command"
+            class="flex justify-between items-start rounded-xl bg-gray-50 p-4"
+        >
+            <div>
+            <p class="font-mono font-semibold">{{ command }}</p>
+            <p class="text-sm text-gray-600">{{ definition }}</p>
+            </div>
+
+            <button
+            type="button"
+            @click="delete form.commands[command]"
+            class="text-red-500 hover:text-red-700"
+            >
+            🗑️
+            </button>
+        </div>
+        </section>
 
       <!-- ================= BOUTONS ================= -->
       <div class="flex justify-between items-center">

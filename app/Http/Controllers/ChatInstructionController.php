@@ -10,8 +10,7 @@ class ChatInstructionController extends Controller
 {
     public function edit(Request $request)
     {
-        $user = $request->user();
-        $instructions = $user->chatInstruction;
+        $instructions = \App\Models\ChatInstruction::where('user_id',auth()->id())->first();
 
         return Inertia::render('Chat/Instructions', [
             'instruction' => $instructions,
@@ -23,20 +22,13 @@ class ChatInstructionController extends Controller
         $user = $request->user();
 
         $data = $request->validate([
-            'about_you' => 'nullable|string',
-            'behaviour' => 'nullable|string',
+            'about_you' => 'nullable|array',
+            'behaviour' => 'nullable|array',
             'commands' => 'nullable|array',
         ]);
 
-        $instructions = $user->chatInstruction;
+        $user->chatInstruction()->updateOrCreate(['user_id' => $user->id], $data);
 
-        if ($instructions) {
-            $instructions->update($data);
-        } else {
-            $data['user_id'] = $user->id;
-            $user->chatInstruction()->create($data);
-        }
-
-        return redirect()->route('chat.instructions.edit')->with('success', 'Instructions mises à jour avec succès!');
+        return redirect('/conversations')->with('success', 'Instructions enregistrées');
     }
 }
