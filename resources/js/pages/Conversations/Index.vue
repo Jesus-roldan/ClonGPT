@@ -1,10 +1,10 @@
 <script setup lang="js">
 import { index } from '@/actions/App/Http/Controllers/ConversationController';
-import { Link, useForm, router } from '@inertiajs/vue3'; // Añadido router
+import { Link, useForm, router } from '@inertiajs/vue3';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import MarkdownIt from 'markdown-it';
-import { nextTick, ref, watch, computed } from 'vue';
+import { nextTick, ref, watch, computed, onMounted } from 'vue';
 import { useStream } from '@laravel/stream-vue';
 
 /* Props */
@@ -48,9 +48,7 @@ const renderMarkdown = (content) => md.render(content || '');
 
 /* --- STREAMING  --- */
 const streamUrl = computed(() => {
-    return props.activeConversationId
-        ? `/conversations/${props.activeConversationId}/stream`
-        : '/ask-stream';
+    return `/conversations/${props.activeConversationId}/stream`;
 });
 
 const { data, isStreaming, send } = useStream(streamUrl, {
@@ -67,28 +65,63 @@ const localMessages = ref([...props.messages]);
 const submit = () => {
     if (!form.prompt.trim() || isStreaming.value) return;
 
-    const currentPrompt = form.prompt;
-    const currentModel = form.model || props.selectedModel || props.models[0]?.id;
-
-    data.value = '';
-
-    localMessages.value.push({
-        id: Date.now(),
-        role: 'user',
-        content: currentPrompt,
-    });
+    const prompt = form.prompt;
+    const model = form.model || props.selectedModel || props.models[0]?.id;
 
     form.prompt = '';
 
+    if (!props.activeConversationId) {
+        router.post('/conversations', {}, {
+            onSuccess: (page) => {
+                const newId = page.props.activeConversationId;
+
+                sessionStorage.setItem('pendingMessage', JSON.stringify({
+                    message: prompt,
+                    model,
+
+                }));
+
+                router.visit(`/conversations/${newId}`, {
+                    preserveState: false,
+                });
+            }
+        });
+        return;
+    }
+
+
+
+    sendMessage(prompt, model);
+};
+
+const sendMessage = (prompt, model) => {
+    localMessages.value.push({
+        id: Date.now(),
+        role: 'user',
+        content: prompt,
+    });
+
+    data.value = '';
+
     send({
-        message: currentPrompt,
-        model: currentModel,
+        message: prompt,
+        model,
         temperature: 1.0,
     });
 };
 
+onMounted(() => {
+    const pending = sessionStorage.getItem('pendingMessage');
 
+    if (pending && props.activeConversationId) {
+        const { message, model } = JSON.parse(pending);
+        sessionStorage.removeItem('pendingMessage');
 
+        nextTick(() => {
+            sendMessage(message, model);
+        });
+    }
+});
 
 const deleteconversation = (id) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette conversation ?')) {
@@ -105,12 +138,11 @@ const updateModel = () => {
     }, { preserveScroll: true });
 };
 
-watch(
-    () => props.activeConversationId,
-    () => {
-        localMessages.value = [...props.messages];
-    }
-);
+watch(() => props.activeConversationId, () => {
+    localMessages.value = [...props.messages];
+    data.value = '';
+
+});
 
 watch(
     () => props.messages,
