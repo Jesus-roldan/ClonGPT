@@ -9,6 +9,7 @@ use App\Services\SimpleAskService;
 use App\Services\SimpleAskStreamService;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Str;
 
 class ConversationController extends Controller
 {
@@ -58,12 +59,16 @@ class ConversationController extends Controller
 
     public function store(Request $request)
     {
-        $conversation = Conversation::create([
-            'user_id' => Auth::id(),
-            'title' => 'Nouvelle conversation…',
+        session([
+            'conversation_title' => Str::limit(trim($request->title), 50)
         ]);
 
-        return redirect()->route('conversations.index', $conversation->id);
+        $conversation = Conversation::create([
+            'user_id' => Auth::id(),
+            'title' => session('conversation_title'),
+        ]);
+
+        return redirect()->route('conversations.index', $conversation);
     }
     /**
      * Update the specified resource in storage.
@@ -106,6 +111,7 @@ class ConversationController extends Controller
 
     public function sendMessageStream(Request $request, Conversation $conversation): StreamedResponse
     {
+
         abort_if($conversation->user_id !== auth()->id(), 403);
 
         $validated = $request->validate([
@@ -120,9 +126,19 @@ class ConversationController extends Controller
             'content' => $validated['message'],
         ]);
 
-        $messages = [
-            ['role' => 'user', 'content' => $validated['message']],
-        ];
+        if ($conversation->messages()->count() === 1) {
+            $conversation->update([
+                'title' => \Illuminate\Support\Str::limit(
+                    trim($validated['message']),
+                    50
+                ),
+            ]);
+        }
+
+        $messages = $conversation->messages()
+            ->orderBy('id')
+            ->get(['role', 'content'])
+            ->toArray();
 
         return response()->stream(
             function () use ($conversation, $messages, $validated) {
@@ -155,5 +171,6 @@ class ConversationController extends Controller
             ]
         );
     }
+
 }
 
