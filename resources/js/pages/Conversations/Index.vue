@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="js">
 import { index } from '@/actions/App/Http/Controllers/ConversationController';
 import { Link, useForm, router } from '@inertiajs/vue3'; // Añadido router
 import hljs from 'highlight.js';
@@ -39,7 +39,7 @@ const md = new MarkdownIt({
         if (lang && hljs.getLanguage(lang)) {
             try {
                 return hljs.highlight(str, { language: lang }).value;
-            } catch (__) {}
+            } catch {}
         }
         return '';
     },
