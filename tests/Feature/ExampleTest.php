@@ -1,7 +1,11 @@
 <?php
+use App\Models\User;
 
 test('returns a successful response', function () {
-    $response = $this->get(route('home'));
+    $user = User::factory()->create();
 
-    $response->assertStatus(200);
+    $response = $this->actingAs($user)->get(route('home'));
+
+    $response->assertStatus(302)
+             ->assertRedirect(route('conversations.index'));
 });
