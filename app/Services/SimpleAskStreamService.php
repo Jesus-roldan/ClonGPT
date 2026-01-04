@@ -21,6 +21,7 @@ class SimpleAskStreamService
 
     private string $apiKey;
     private string $baseUrl;
+    private string $lastFullContent = '';
 
     public function __construct()
     {
@@ -77,12 +78,20 @@ class SimpleAskStreamService
      * Output le contenu texte directement (compatible avec useStream de Laravel).
      */
     public function streamToOutput(
-        array $messages,
-        ?string $model = null,
-        float $temperature = 1.0,
-        ?string $reasoningEffort = null
+    array $messages,
+    ?string $model = null,
+    float $temperature = 1.0,
+    ?string $reasoningEffort = null
     ): void {
-        $response = $this->sendStreamRequest($messages, $model, $temperature, $reasoningEffort);
+
+        $this->lastFullContent = '';
+
+        $response = $this->sendStreamRequest(
+            $messages,
+            $model,
+            $temperature,
+            $reasoningEffort
+        );
 
         if ($response->failed()) {
             echo "[ERROR] " . $response->json('error.message', 'HTTP Error');
@@ -99,15 +108,23 @@ class SimpleAskStreamService
 
             if ($event['type'] === 'content' && $event['data']) {
                 echo $event['data'];
+                $this->lastFullContent .= $event['data'];
                 $this->flush();
             }
 
-            // Pour le reasoning, on utilise un préfixe spécial
+            // Reasoning encapsulé
             if ($event['type'] === 'reasoning' && $event['data']) {
                 echo "[REASONING]" . $event['data'] . "[/REASONING]";
+                $this->lastFullContent .= $event['data'];
                 $this->flush();
             }
         }
+    }
+
+
+    public function getLastFullContent(): string
+    {
+        return $this->lastFullContent;
     }
 
     /**

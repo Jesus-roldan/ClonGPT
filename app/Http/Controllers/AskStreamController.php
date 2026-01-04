@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\Conversation;
+use Illuminate\Support\Str;
+
 
 /**
  * Controller pour la démonstration du streaming SSE.
@@ -55,14 +58,45 @@ class AskStreamController extends Controller
             $user->update(['preferred_model' => $validated['model']]);
         }
 
-        $messages = [['role' => 'user', 'content' => $validated['message']]];
+        $conversation = Conversation::create([
+            'user_id' => auth()->id(),
+            'title' => Str::limit(trim($validated['message']), 50),
+        ]);
+
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => $validated['message'],
+        ]);
+
+        $messages = [
+            ['role' => 'user', 'content' => $validated['message']],
+        ];
         $model = $validated['model'];
         $temperature = (float) ($validated['temperature'] ?? 1.0);
         $reasoningEffort = $validated['reasoning_effort'] ?? null;
 
         return response()->stream(
-            function () use ($messages, $model, $temperature, $reasoningEffort): void {
+            function () use ($conversation, $messages, $model, $temperature, $reasoningEffort): void {
+
+                while (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+
                 $this->streamService->streamToOutput($messages, $model, $temperature, $reasoningEffort);
+
+                echo "\n{$conversation->id}";
+                flush();
+
+                $this->streamService->streamToOutput($messages, $model, $temperature, $reasoningEffort);
+
+                $fullAIResponse = $this->streamService->getLastFullContent();
+
+                if (!empty($fullAIResponse)) {
+                    $conversation->messages()->create([
+                        'role' => 'assistant',
+                        'content' => $fullAIResponse,
+                    ]);
+                }
             },
             headers: [
                 'Content-Type' => 'text/plain; charset=utf-8',

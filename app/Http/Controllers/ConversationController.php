@@ -6,12 +6,15 @@ use App\Models\Conversation;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Services\SimpleAskService;
+use App\Services\SimpleAskStreamService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ConversationController extends Controller
 {
-    public function __construct(private SimpleAskService $askService) {}
+    public function __construct(
+    private SimpleAskService $askService,
+    private SimpleAskStreamService $streamService) {}
     /**
      * Display a listing of the resource.
      */
@@ -23,6 +26,8 @@ class ConversationController extends Controller
 
        if ($conversationId) {
              $conversation = Conversation::where('id', $conversationId)->where('user_id', $user->id)->firstOrFail();
+        }else {
+            $conversation = null;
         }
 
         $messages = $conversation
@@ -35,11 +40,11 @@ class ConversationController extends Controller
 
 
         return Inertia::render('Conversations/Index', [
-            'activeConversationId' => $conversation ? $conversation->id : null,
+            'activeConversationId' =>$conversation?->id,
             'messages' => $messages,
             'conversations' => $userConversations,
             'models' => $models,
-            'selectedModel' => $conversation->model ?? null,
+            'selectedModel' => $conversation?->model,
         ]);
     }
 
@@ -51,67 +56,18 @@ class ConversationController extends Controller
         //
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        set_time_limit(300);
-
-        $request->validate(['prompt' => 'required|string|max:1000']);
-
-        $userPrompt = $request->input('prompt');
-
-        $instruction = Auth::user()->chatInstruction;
-        $commands = $instruction?->commands ?? [];
-
-        $systemCommandPrompt = null;
-
-        foreach ($commands as $command => $definition) {
-            if (str_starts_with($userPrompt, $command)) {
-                $systemCommandPrompt = "COMMANDE PERSONNALISÉE {$command}:\n{$definition}";
-                $userPrompt = trim(str_replace($command, '', $userPrompt));
-                break;
-            }
-        }
-
-
         $conversation = Conversation::create([
             'user_id' => Auth::id(),
             'title' => 'Nouvelle conversation…',
         ]);
 
-        $apiMessages = [];
-
-        if ($systemCommandPrompt) {
-            $apiMessages[] = [
-                'role' => 'system',
-                'content' => $systemCommandPrompt,
-            ];
-        }
-
-        $apiMessages[] = [
-            'role' => 'user',
-            'content' => $userPrompt,
-        ];
-
-        try {
-            $aiResponseContent = $this->askService->sendMessage($apiMessages);
-        } catch (\Exception $e) {
-
-             $aiResponseContent = "Erreur : Désolé, il y a eu un problème pour contacter l’IA." . $e->getMessage();
-        }
-
-        $conversation->messages()->createMany([
-            ['role' => 'user', 'content' => $userPrompt],
-            ['role' => 'assistant', 'content' => $aiResponseContent],
-        ]);
-
-        $conversation->update(['title' => Str::limit($userPrompt, 50)]);
-
-
         return redirect()->route('conversations.index', $conversation->id);
     }
+    /**
+     * Update the specified resource in storage.
+     */
 
     public function updateModel(Request $request, Conversation $conversation)
     {
@@ -128,7 +84,7 @@ class ConversationController extends Controller
             'model' => $request->model,
         ]);
 
-        return response()->json(['success' => true]);
+        return back();
     }
     /**
      * Remove the specified resource from storage.
@@ -143,84 +99,61 @@ class ConversationController extends Controller
         return redirect()->route('conversations.index');
     }
 
-    public function sendMessage(Request $request, Conversation $conversation)
+    /**
+     * Envoyer un message dans une conversation avec streaming.
+     */
+
+
+    public function sendMessageStream(Request $request, Conversation $conversation): StreamedResponse
     {
-        $request->validate([
-        'prompt' => 'required|string|max:1000',
-    ]);
+        abort_if($conversation->user_id !== auth()->id(), 403);
 
-    $userPrompt = $request->input('prompt');
-    $model = $request->input('model');
+        $validated = $request->validate([
+            'message' => 'required|string|max:100000',
+            'model' => 'required|string',
+            'temperature' => 'nullable|numeric|min:0|max:2',
+            'reasoning_effort' => 'nullable|string|in:low,medium,high',
+        ]);
 
-    if ($model) {
-        $conversation->update(['model' => $model]);
-    }
-
-    $instruction = Auth::user()->chatInstruction;
-    $commands = $instruction?->commands ?? [];
-
-    $commandPrompt = null;
-    foreach ($commands as $command => $definition) {
-        if (str_starts_with($userPrompt, $command)) {
-
-            $commandPrompt = "{$definition}\n\nTexte à traiter : " . trim(str_replace($command, '', $userPrompt));
-            break;
-        }
-    }
-
-    $conversationMessages = $conversation->messages()
-        ->orderBy('id')
-        ->get(['role', 'content'])
-        ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
-        ->toArray();
-
-    $apiMessages = [];
-
-    $systemPrompt = $this->askService->getSystemPrompt()['content'] ?? null;
-    if ($systemPrompt) {
-        $apiMessages[] = [
-            'role' => 'system',
-            'content' => $systemPrompt,
-        ];
-    }
-
-    $apiMessages = [...$apiMessages, ...$conversationMessages];
-
-    if ($commandPrompt) {
-        $apiMessages[] = [
+        $conversation->messages()->create([
             'role' => 'user',
-            'content' => $commandPrompt,
+            'content' => $validated['message'],
+        ]);
+
+        $messages = [
+            ['role' => 'user', 'content' => $validated['message']],
         ];
-    } else {
-        $apiMessages[] = [
-            'role' => 'user',
-            'content' => $userPrompt,
-        ];
+
+        return response()->stream(
+            function () use ($conversation, $messages, $validated) {
+
+                while (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+
+                $this->streamService->streamToOutput(
+                    $messages,
+                    $validated['model'],
+                    (float) ($validated['temperature'] ?? 1.0),
+                    $validated['reasoning_effort'] ?? null
+                );
+
+                $full = $this->streamService->getLastFullContent();
+
+                if ($full !== '') {
+                    $conversation->messages()->create([
+                        'role' => 'assistant',
+                        'content' => $full,
+                    ]);
+                }
+            },
+            200,
+            [
+                'Content-Type' => 'text/plain; charset=utf-8',
+                'Cache-Control' => 'no-cache, no-store',
+                'X-Accel-Buffering' => 'no',
+            ]
+        );
     }
-
-    try {
-        $aiResponseContent = $this->askService->sendMessage($apiMessages, $model);
-    } catch (\Exception $e) {
-        $aiResponseContent = "Erreur : " . $e->getMessage();
-    }
-
-    $conversation->messages()->createMany([
-        ['role' => 'user', 'content' => $userPrompt],
-        ['role' => 'assistant', 'content' => $aiResponseContent],
-    ]);
-
-    $conversation->update(['title' => Str::limit($userPrompt, 50)]);
-
-    $messages = $conversation->messages()->orderBy('id')->get(['id', 'role', 'content'])->toArray();
-    $userConversations = auth()->user()->conversations()->orderBy('updated_at', 'desc')->get(['id', 'title']);
-
-    return Inertia::render('Conversations/Index', [
-        'activeConversationId' => $conversation->id,
-        'messages' => $messages,
-        'conversations' => $userConversations,
-        'models' => $this->askService->getModels(),
-        'selectedModel' => $conversation->model,
-    ]);
-    }
-
 }
+
