@@ -12,7 +12,7 @@ Route::get('dashboard', function () {
 
 Route::middleware(['auth','verified'])->group(function(){
 
-Route::get('/', function() {return redirect()->route('conversations.index');})->name('root');
+Route::get('/', function() {return redirect()->route('conversations.index');})->name('home');
 
 Route::get('conversations/{conversation?}', [ConversationController::class, 'index'])->name('conversations.index');
 
