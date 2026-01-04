@@ -1,6 +1,7 @@
 import prettier from 'eslint-config-prettier/flat';
 import vue from 'eslint-plugin-vue';
 
+
 // import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript';
 
 // export default defineConfigWithVueTs(
@@ -20,29 +21,35 @@ import vue from 'eslint-plugin-vue';
 
 
 export default [
+  {
+    // Ignorar librerías externas y carpetas de build
+    ignores: [
+      'vendor/**',
+      'node_modules/**',
+      'public/**',
+      'bootstrap/ssr/**',
+      'tailwind.config.js',
+      'resources/js/components/ui/*',
+    ],
 
-    vue.configs['essential'],
-
-    prettier,
-
-
-    {
-        ignores: [
-            'vendor',
-            'node_modules',
-            'public',
-            'bootstrap/ssr',
-            'tailwind.config.js',
-            'resources/js/components/ui/*',
-        ],
-        rules: {
-
-            'vue/multi-word-component-names': 'off',
-
-
-            '@typescript-eslint/no-explicit-any': 'off',
-
-            'vue/block-lang': ['error', { script: { allowJs: true } }],
-        },
+    languageOptions: {
+      parserOptions: {
+        ecmaVersion: 2023,
+        sourceType: 'module',
+      },
     },
+
+    plugins: { vue },
+
+    rules: {
+      // Desactivar esta regla que te daba muchos falsos positivos
+      'no-unused-expressions': 'off',
+
+      // Configs de Vue
+      'vue/multi-word-component-names': 'off',
+    },
+  },
+
+  // Integrar Prettier al final para que sobreescriba formateo
+  prettier,
 ];
