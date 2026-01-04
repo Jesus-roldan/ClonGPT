@@ -11,11 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('conversations', function (Blueprint $table) {
+        Schema::create('chat_instructions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('title')->default('Nouvelle conversation');
-            $table->string('model')->nullable();
+            $table->foreignId('user_id')->con­strained()->cascadeOnDelete();
+            $table->json('about_you')->nullable();
+            $table->json('behaviour')->nullable();
+            $table->json('commands')->nullable();
             $table->timestamps();
         });
     }
@@ -25,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('conversations');
+        Schema::dropIfExists('chat_instructions');
     }
 };
