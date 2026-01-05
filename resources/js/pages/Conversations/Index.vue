@@ -71,7 +71,9 @@ const submit = () => {
     form.prompt = '';
 
     if (!props.activeConversationId) {
-        router.post('/conversations', {}, {
+        router.post('/conversations', {
+            title: prompt,}, {
+            preserveState: false,
             onSuccess: (page) => {
                 const newId = page.props.activeConversationId;
 
@@ -88,8 +90,6 @@ const submit = () => {
         });
         return;
     }
-
-
 
     sendMessage(prompt, model);
 };
