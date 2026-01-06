@@ -35,7 +35,7 @@ class SimpleAskStreamService
     public function getModels(): array
     {
         return cache()->remember('openrouter.models', now()->addHour(), function (): array {
-            $response = Http::withToken($this->apiKey)->get("{$this->baseUrl}/models");
+            $response = Http::withoutVerifying()->withToken($this->apiKey)->get("{$this->baseUrl}/models");
 
             return collect($response->json('data', []))
                 ->sortBy('name')
@@ -158,7 +158,8 @@ class SimpleAskStreamService
             $payload['reasoning'] = ['effort' => $reasoningEffort];
         }
 
-        return Http::withToken($this->apiKey)
+        return Http::withoutVerifying()
+            ->withToken($this->apiKey)
             ->withHeaders([
                 'HTTP-Referer' => config('app.url'),
                 'X-Title' => config('app.name'),

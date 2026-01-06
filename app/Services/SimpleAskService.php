@@ -30,11 +30,11 @@ public function __construct()
     $this->apiKey = config('services.openrouter.api_key');
     $this->baseUrl = rtrim(config('services.openrouter.base_url', 'https://openrouter.ai/api/v1'), '/');
 
-    $this->certPath = "C:\\laragon\\etc\\ssl\\cacert(2).pem"; //
+    // $this->certPath = "C:\\laragon\\etc\\ssl\\cacert(2).pem";
 
 
     $this->client = Http::withOptions([
-        'verify' => $this->certPath,
+        'verify' => false,
     ])->withHeaders([
         'Authorization' => 'Bearer ' . $this->apiKey,
         'Content-Type'  => 'application/json',
